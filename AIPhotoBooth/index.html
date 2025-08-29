@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Photo Booth</title>
+<style>
+  body {
+    display: flex;
+    font-family: "Segoe UI", Tahoma, sans-serif;
+    height: 100vh;
+    margin: 0;
+    background: linear-gradient(135deg, #ece9e6, #ffffff);
+    overflow: hidden; /* No scroll */
+  }
+
+  .left, .right {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .left {
+    border-right: 2px solid #eee;
+    background: #fafafa;
+  }
+
+  /* Fixed media container */
+  .media-box {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 650px;
+    height: 55vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    border-radius: 20px;
+    overflow: hidden;
+    background: #000;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    margin-bottom: 12px;
+  }
+
+  video {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    border-radius: 20px;
+    transform: scaleX(-1); /* Mirror preview */
+  }
+
+  #capturedImg, .comparison-container {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: cover;
+    border-radius: 20px;
+  }
+
+  canvas { display: none; }
+  .comparison-container { display: none; }
+  .comparison-container img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    pointer-events: none;
+  }
+  .overlay {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%; width: 50%;
+    overflow: hidden;
+  }
+  .overlay img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+  }
+  .slider {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 24px; height: 24px;
+    background: #0078ff;
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    cursor: ew-resize;
+    z-index: 10;
+  }
+
+  /* Controls */
+  .controls {
+    flex: 1;
+    width: 100%;
+    max-width: 650px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .prompt-examples {
+    width: 100%;
+    margin: 15px 0;
+  }
+  .prompt-examples p {
+    font-size: 16px;
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #444;
+  }
+  .prompt-examples button {
+    width: 100%;
+    margin: 5px 0;
+    background: #f4f4f4;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 15px;
+    padding: 10px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .prompt-examples button:hover {
+    background: #0078ff;
+    color: #fff;
+  }
+
+  input[type="text"], button.action {
+    width: 100%;
+    margin: 8px 0;
+    font-size: 16px;
+    border-radius: 10px;
+    padding: 12px;
+    border: none;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+  }
+
+  button.action {
+    background: #0078ff;
+    color: white;
+    cursor: pointer;
+    transition: 0.3s;
+  }
+  button.action:hover { background: #005ecc; }
+
+  .title { font-size: 34px; font-weight: bold; margin-bottom: 15px; color: #333; }
+  .desc { font-size: 18px; margin-bottom: 35px; color: #555; text-align: center; max-width: 450px; }
+</style>
+</head>
+<body>
+
+  <!-- Left Section -->
+  <div class="left">
+
+    <!-- Camera/Output -->
+    <div class="media-box">
+      <video id="camera" autoplay playsinline></video>
+      <canvas id="canvas"></canvas>
+      <img id="capturedImg" style="display:none;">
+      <div class="comparison-container" id="compareBox">
+        <img id="inputImgCompare">
+        <div class="overlay" id="overlayDiv">
+          <img id="outputImg">
+        </div>
+        <div class="slider" id="slider"></div>
+      </div>
+    </div>
+
+    <!-- 📸 Capture button just below -->
+    <button id="captureBtn" class="action" style="max-width:650px;">📸 Capture</button>
+
+    <!-- Prompt + Examples -->
+    <div class="controls">
+      <div class="prompt-examples">
+        <p>✨ Try these example prompts:</p>
+        <button onclick="setPrompt('Convert this image to Ghibli style')">Convert this image to Ghibli style</button>
+        <button onclick="setPrompt('Cartoonize this image')">Cartoonize this image</button>
+        <button onclick="setPrompt('Change the Background to a Forest and add relevant Costume to me.')">Change background to a Forest</button>
+        <button onclick="setPrompt('Add Iron Man Suit to me without helmet, my face should be visible, and I’m working on something in Ironman studio.')">Add Iron Man Suit</button>
+        <button onclick="setPrompt('Make me a PUBG player holding M416 in the battleground')">PUBG player holding M416</button>
+      </div>
+
+      <input type="text" id="promptBox" placeholder="Enter your style prompt (e.g., 90s cartoon)">
+    </div>
+
+  </div>
+
+  <!-- Right Section -->
+  <div class="right">
+    <div class="title">AI Photo Booth</div>
+    <div class="desc">Capture your photo and transform it into amazing styles with the power of AI!</div>
+    <button id="submitBtn" class="action" disabled>✨ Generate Image</button>
+    <button id="newBtn" class="action" style="display:none;">🔄 Capture Another</button>
+  </div>
+
+<script>
+const video = document.getElementById("camera");
+const canvas = document.getElementById("canvas");
+const captureBtn = document.getElementById("captureBtn");
+const submitBtn = document.getElementById("submitBtn");
+const outputImg = document.getElementById("outputImg");
+const inputImgCompare = document.getElementById("inputImgCompare");
+const compareBox = document.getElementById("compareBox");
+const capturedImg = document.getElementById("capturedImg");
+const newBtn = document.getElementById("newBtn");
+const promptBox = document.getElementById("promptBox");
+const overlayDiv = document.getElementById("overlayDiv");
+const slider = document.getElementById("slider");
+
+let stream;
+
+// Function to set example prompt
+function setPrompt(text) {
+  promptBox.value = text;
+}
+
+// Start camera
+navigator.mediaDevices.getUserMedia({ video: true })
+  .then(s => { stream = s; video.srcObject = s; })
+  .catch(err => alert("Camera access denied!"));
+
+// Capture photo
+captureBtn.onclick = () => {
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+
+  const ctx = canvas.getContext("2d");
+  // 🚀 Flip back to normal while drawing
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  stream.getTracks().forEach(track => track.stop());
+  video.style.display = "none";
+
+  capturedImg.src = canvas.toDataURL("image/jpeg");
+  capturedImg.style.display = "block";
+
+  submitBtn.disabled = false;
+};
+
+// Submit to Flask
+submitBtn.onclick = async () => {
+  const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg"));
+  const formData = new FormData();
+  formData.append("image", blob, "capture.jpg");
+  formData.append("prompt", promptBox.value);
+
+  submitBtn.innerText = "⏳ Generating...";
+  submitBtn.disabled = true;
+
+  const res = await fetch("/generate", { method: "POST", body: formData });
+  const data = await res.json();
+
+  if (data.output_url) {
+    inputImgCompare.src = capturedImg.src;
+    outputImg.src = data.output_url;
+
+    compareBox.style.display = "block";
+    capturedImg.style.display = "none";
+    video.style.display = "none";
+    captureBtn.style.display = "none";
+    newBtn.style.display = "block";
+
+    initSlider();
+  }
+
+  submitBtn.innerText = "✨ Generate Image";
+};
+
+// Reset
+newBtn.onclick = () => {
+  compareBox.style.display = "none";
+  capturedImg.style.display = "none";
+  video.style.display = "block";
+  captureBtn.style.display = "block";
+  newBtn.style.display = "none";
+  submitBtn.disabled = true;
+
+  navigator.mediaDevices.getUserMedia({ video: true })
+    .then(s => { stream = s; video.srcObject = s; });
+};
+
+// Draggable slider
+function initSlider() {
+  let isDragging = false;
+
+  slider.onmousedown = e => { isDragging = true; e.preventDefault(); };
+  window.onmouseup = () => { isDragging = false; };
+
+  window.onmousemove = e => {
+    if (!isDragging) return;
+    const rect = compareBox.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    if (x < 0) x = 0;
+    if (x > rect.width) x = rect.width;
+    const percent = (x / rect.width) * 100;
+    overlayDiv.style.width = percent + "%";
+    slider.style.left = percent + "%";
+  };
+}
+</script>
+</body>
+</html>

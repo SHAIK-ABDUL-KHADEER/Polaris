@@ -1,0 +1,10 @@
+{
+    "window_width": 1280,
+    "window_height": 720,
+    "camera_index": 1,
+    "target_fps": 30,
+    "skeleton_thickness": 4,
+    "joint_radius": 8,
+    "status_font_size": 30,
+    "show_camera_preview": false
+}
